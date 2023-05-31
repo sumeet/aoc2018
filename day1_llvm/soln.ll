@@ -3,29 +3,76 @@
 #define SYSCALL_READ i64 0
 #define SYSCALL_WRITE i64 1
 #define SYSCALL_OPEN i64 2
+#define SYSCALL_SEEK i64 8
 #define SYSCALL_EXIT i64 60
 
 #define HELLO_LEN 15
 @.hello = constant [HELLO_LEN x i8] c"Hello, World!\0A\00"
-@.input_filename = constant [6 x i8] c"input\00"
+;;@.input_filename = constant [6 x i8] c"input\00"
+@.input_filename = constant [6 x i8] c"sampl\00"
 
 define i32 @main() {
-entry:
   %fd = call i64 @open(PTR(6, @.input_filename))
 
-  %c = call i8 @getc(i64 %fd)
-  call void @putc(i8 %c)
-  %d = call i8 @getc(i64 %fd)
-  call void @putc(i8 %d)
+  #define PLUS 43
 
-  call i64 @syscall(
-    SYSCALL_WRITE,
-    STDOUT,
-    i64 ptrtoint (PTR(HELLO_LEN, @.hello) to i64),
-    i64 HELLO_LEN
-  )
-  call i64 @exit(i64 0)
+  ; br label %loop
+  ; loop:
+  ;   %c = call i8 @getc(i64 %fd)
+  ;   %cmp = icmp eq i8 %c, -1
+  ;   br i1 %cmp, label %endloop, label %loopbody
+  ; loopbody:
+  ;   call void @putc(i8 %c)
+  ;   br label %loop
+  ; endloop:
+
+  ; call i64 @syscall(
+  ;   SYSCALL_WRITE,
+  ;   STDOUT,
+  ;   i64 ptrtoint (PTR(HELLO_LEN, @.hello) to i64),
+  ;   i64 HELLO_LEN
+  ; )
+  %plusorminus = call i8 @getc(i64 %fd)
+  %n = call i64 @getnum(i64 %fd)
+  call i64 @exit(i64 %n)
   ret i32 0
+}
+
+; assumes that %fd is pointing to a number, this will return 0
+; and seek backwards, really undefined behavior otherwise
+define i64 @getnum(i64 %fd) {
+  #define ZERO 48
+  #define NINE 57
+  entry:
+    br label %loop
+  loop:
+    %acc = phi i64 [0, %entry], [%nextacc, %isnum]
+
+    %n = call i8 @getc(i64 %fd)
+    %cond1 = icmp sgt i8 %n, ZERO
+    %cond2 = icmp slt i8 %n, NINE
+    %cond = and i1 %cond1, %cond2
+    br i1 %cond, label %isnum, label %isnotnum
+  isnum:
+    %n1 = sub i8 %n, ZERO
+    %n2 = sext i8 %n1 to i64
+    %acc2 = mul i64 %acc, 10
+    %nextacc = add i64 %acc2, %n2
+    br label %loop
+  isnotnum:
+    call void @seek_rel(i64 %fd, i64 -1)
+    ret i64 %acc
+}
+
+define void @seek_rel(i64 %fd, i64 %offset) {
+  #define SEEK_CUR 1
+  call i64 @syscall(
+    SYSCALL_SEEK,
+    i64 %fd,
+    i64 %offset,
+    i64 SEEK_CUR
+  )
+  ret void
 }
 
 define void @putc(i8 %c) {
@@ -46,14 +93,19 @@ define i8 @getc(i64 %fd) {
   %buf = alloca i8
   %bufptr = ptrtoint i8* %buf to i64
   #define LEN 1
-  %ret = call i64 @syscall(
+  %num_read = call i64 @syscall(
     SYSCALL_READ,
     i64 %fd,
     i64 %bufptr,
     i64 LEN
   )
-  %value = load i8, i8* %buf
-  ret i8 %value
+  %cmp = icmp ne i64 %num_read, 0
+  br i1 %cmp, label %read, label %eof
+  read:
+    %value = load i8, i8* %buf
+    ret i8 %value
+  eof:
+    ret i8 -1
 }
 
 define i64 @open(i8* %path) {
