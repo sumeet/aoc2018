@@ -17,17 +17,18 @@ define i32 @main() {
     %fd = call i64 @open(PTR(6, @.input_filename))
     br label %loop
   loop:
-    %prevsum = phi i64 [0, %entry], [%sum, %isnotend]
+    %sum = phi i64 [0, %entry], [%nextsum, %isnotend]
     %plusorminus = call i8 @getc(i64 %fd)
     %endcond = icmp eq i8 %plusorminus, -1
     br i1 %endcond, label %end, label %isnotend
   isnotend:
     %n = call i64 @getnum(i64 %fd)
     call i8 @getc(i64 %fd) ; this is the newline
-
+    %nextsum = add i64 %sum, %n
+    br label %loop
   end:
     ;; @putnum %sum
-    call i64 @exit(i64 0)
+    call i64 @exit(i64 %sum)
     ret i32 0
 }
 
