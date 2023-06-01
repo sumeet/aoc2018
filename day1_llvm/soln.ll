@@ -1,4 +1,5 @@
 #define PTR(len, const) i8* getelementptr inbounds ([len x i8], [len x i8]* const, i32 0, i32 0)
+#define NEWLINE 10
 #define STDOUT i64 1
 #define SYSCALL_READ i64 0
 #define SYSCALL_WRITE i64 1
@@ -8,8 +9,8 @@
 
 #define HELLO_LEN 15
 @.hello = constant [HELLO_LEN x i8] c"Hello, World!\0A\00"
-;;@.input_filename = constant [6 x i8] c"input\00"
-@.input_filename = constant [6 x i8] c"sampl\00"
+@.input_filename = constant [6 x i8] c"input\00"
+;;@.input_filename = constant [6 x i8] c"sampl\00"
 
 define i32 @main() {
   #define PLUS 43
@@ -19,17 +20,42 @@ define i32 @main() {
   loop:
     %sum = phi i64 [0, %entry], [%nextsum, %isnotend]
     %plusorminus = call i8 @getc(i64 %fd)
+    %m1 = sext i8 %plusorminus to i64
+    %m2 = sub i64 44, %m1
     %endcond = icmp eq i8 %plusorminus, -1
     br i1 %endcond, label %end, label %isnotend
   isnotend:
     %n = call i64 @getnum(i64 %fd)
+    %n2 = mul i64 %n, %m2
     call i8 @getc(i64 %fd) ; this is the newline
-    %nextsum = add i64 %sum, %n
+    %nextsum = add i64 %sum, %n2
     br label %loop
   end:
-    ;; @putnum %sum
-    call i64 @exit(i64 %sum)
+    call void @putnum(i64 %sum)
+    call i64 @exit(i64 0)
     ret i32 0
+}
+
+define void @putnum(i64 %n) {
+  #define ZERO 48
+  entry:
+    %rem = urem i64 %n, 10
+    %quot = udiv i64 %n, 10
+    %islast = icmp eq i64 %quot, 0
+    br i1 %islast, label %print, label %notlast
+  notlast:
+    call void @putnum(i64 %quot)
+    br label %print
+  print:
+    %c64 = add i64 %rem, ZERO
+    %c = trunc i64 %c64 to i8
+    call void @putc(i8 %c)
+    br i1 %islast, label %end, label %printnl
+  printnl:
+    call void @putc(i8 NEWLINE)
+    br label %end
+  end:
+    ret void
 }
 
 ; assumes that %fd is pointing to a number, this will return 0
