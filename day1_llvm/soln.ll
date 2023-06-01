@@ -12,30 +12,23 @@
 @.input_filename = constant [6 x i8] c"sampl\00"
 
 define i32 @main() {
-  %fd = call i64 @open(PTR(6, @.input_filename))
-
   #define PLUS 43
+  entry:
+    %fd = call i64 @open(PTR(6, @.input_filename))
+    br label %loop
+  loop:
+    %prevsum = phi i64 [0, %entry], [%sum, %isnotend]
+    %plusorminus = call i8 @getc(i64 %fd)
+    %endcond = icmp eq i8 %plusorminus, -1
+    br i1 %endcond, label %end, label %isnotend
+  isnotend:
+    %n = call i64 @getnum(i64 %fd)
+    call i8 @getc(i64 %fd) ; this is the newline
 
-  ; br label %loop
-  ; loop:
-  ;   %c = call i8 @getc(i64 %fd)
-  ;   %cmp = icmp eq i8 %c, -1
-  ;   br i1 %cmp, label %endloop, label %loopbody
-  ; loopbody:
-  ;   call void @putc(i8 %c)
-  ;   br label %loop
-  ; endloop:
-
-  ; call i64 @syscall(
-  ;   SYSCALL_WRITE,
-  ;   STDOUT,
-  ;   i64 ptrtoint (PTR(HELLO_LEN, @.hello) to i64),
-  ;   i64 HELLO_LEN
-  ; )
-  %plusorminus = call i8 @getc(i64 %fd)
-  %n = call i64 @getnum(i64 %fd)
-  call i64 @exit(i64 %n)
-  ret i32 0
+  end:
+    ;; @putnum %sum
+    call i64 @exit(i64 0)
+    ret i32 0
 }
 
 ; assumes that %fd is pointing to a number, this will return 0
@@ -49,8 +42,8 @@ define i64 @getnum(i64 %fd) {
     %acc = phi i64 [0, %entry], [%nextacc, %isnum]
 
     %n = call i8 @getc(i64 %fd)
-    %cond1 = icmp sgt i8 %n, ZERO
-    %cond2 = icmp slt i8 %n, NINE
+    %cond1 = icmp sge i8 %n, ZERO
+    %cond2 = icmp sle i8 %n, NINE
     %cond = and i1 %cond1, %cond2
     br i1 %cond, label %isnum, label %isnotnum
   isnum:
