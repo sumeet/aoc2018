@@ -11,23 +11,24 @@
 @.hello = constant [HELLO_LEN x i8] c"Hello, World!\0A\00"
 #define INPUT_FILENAME_LEN 6
 @.input_filename = constant [INPUT_FILENAME_LEN x i8] c"input\00"
-;;@.input_filename = constant [INPUT_FILENAME_LEN x i8] c"sampl\00"
+;@.input_filename = constant [INPUT_FILENAME_LEN x i8] c"sampl\00"
 
-#define MEMORY_LEN 100000
+#define MEMORY_LEN 1000000
 @.memory = global [MEMORY_LEN x i64] zeroinitializer
+@.memory_end = global i64 0
 
 define i1 @searchmemoryorput(i64 %needle) {
   entry:
     br label %loop
   loop:
     %i = phi i64 [0, %entry], [%nexti, %notfound]
-    %cond = icmp eq i64 %i, MEMORY_LEN
+    %mend = load i64, i64* @.memory_end
+    %cond = icmp eq i64 %i, %mend
     br i1 %cond, label %end, label %isnotend
   isnotend:
-    ;%m = PTR(MEMORY_LEN, @.memory, %i)
-    %m = i8* getelementptr inbounds ([100000 x i8], [100000 x i8]* @.memory, i32 0, i32 %i)
-    %cur = load i64, i64* %m
-    %cond2 = icmp eq i64 %m2, %needle
+    %curptr = getelementptr inbounds [MEMORY_LEN x i64], [MEMORY_LEN x i64]* @.memory, i64 0, i64 %i
+    %cur = load i64, i64* %curptr
+    %cond2 = icmp eq i64 %cur, %needle
     br i1 %cond2, label %found, label %notfound
   notfound:
     %nexti = add i64 %i, 1
@@ -35,8 +36,10 @@ define i1 @searchmemoryorput(i64 %needle) {
   found:
     ret i1 1
   end:
-    %lastloc = PTR(MEMORY_LEN, @.memory, %i)
-    store i64 %needle, i64* %lastloc
+    %lastptr = getelementptr inbounds [MEMORY_LEN x i64], [MEMORY_LEN x i64]* @.memory, i64 0, i64 %mend
+    store i64 %needle, i64* %lastptr
+    %mend2 = add i64 %mend, 1
+    store i64 %mend2, i64* @.memory_end
     ret i1 0
 }
 
@@ -44,12 +47,38 @@ define i32 @main() {
     %part1 = call i64 @part1()
     call void @putnum(i64 %part1)
     call void @putc(i8 NEWLINE)
+    %part2 = call i64 @part2()
+    call void @putnum(i64 %part2)
+    call void @putc(i8 NEWLINE)
     call i64 @exit(i64 0)
     ret i32 0
 }
 
 define i64 @part2() {
-  ret i64 0
+  #define PLUS 43
+  entry:
+    %fd = call i64 @open(PTR(INPUT_FILENAME_LEN, @.input_filename, 0))
+    br label %loop
+  reloop:
+    call void @seek_abs(i64 %fd, i64 0)
+    br label %loop
+  loop:
+    %sum = phi i64 [0, %entry], [%nextsum, %isnotend], [%sum, %reloop]
+    %plusorminuschar = call i8 @getc(i64 %fd)
+    %endcond = icmp eq i8 %plusorminuschar, -1 ; -1 is EOF
+    br i1 %endcond, label %reloop, label %isnotend
+  isnotend:
+    %p1 = sext i8 %plusorminuschar to i64
+    %plusorminus = sub i64 44, %p1
+    ; if EOF then this time, we reloop the file, and keep searching
+    %n = call i64 @getnum(i64 %fd)
+    %n2 = mul i64 %n, %plusorminus
+    call i8 @getc(i64 %fd) ; this is the newline
+    %nextsum = add i64 %sum, %n2
+    %isfound = call i1 @searchmemoryorput(i64 %nextsum)
+    br i1 %isfound, label %end, label %loop
+  end:
+    ret i64 %nextsum
 }
 
 define i64 @part1() {
@@ -124,6 +153,17 @@ define void @seek_rel(i64 %fd, i64 %offset) {
     i64 %fd,
     i64 %offset,
     i64 SEEK_CUR
+  )
+  ret void
+}
+
+define void @seek_abs(i64 %fd, i64 %offset) {
+  #define SEEK_SET 0
+  call i64 @syscall(
+    SYSCALL_SEEK,
+    i64 %fd,
+    i64 %offset,
+    i64 SEEK_SET
   )
   ret void
 }
