@@ -32,6 +32,7 @@ define i32 @main() {
     br label %loop
   end:
     call void @putnum(i64 %sum)
+    call void @putc(i8 NEWLINE)
     call i64 @exit(i64 0)
     ret i32 0
 }
@@ -50,11 +51,6 @@ define void @putnum(i64 %n) {
     %c64 = add i64 %rem, ZERO
     %c = trunc i64 %c64 to i8
     call void @putc(i8 %c)
-    br i1 %islast, label %end, label %printnl
-  printnl:
-    call void @putc(i8 NEWLINE)
-    br label %end
-  end:
     ret void
 }
 
