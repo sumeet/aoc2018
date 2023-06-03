@@ -1,4 +1,4 @@
-#define PTR(len, const) i8* getelementptr inbounds ([len x i8], [len x i8]* const, i32 0, i32 0)
+#define PTR(len, const, idx) i8* getelementptr inbounds ([len x i8], [len x i8]* const, i32 0, i32 idx)
 #define NEWLINE 10
 #define STDOUT i64 1
 #define SYSCALL_READ i64 0
@@ -9,13 +9,53 @@
 
 #define HELLO_LEN 15
 @.hello = constant [HELLO_LEN x i8] c"Hello, World!\0A\00"
-@.input_filename = constant [6 x i8] c"input\00"
-;;@.input_filename = constant [6 x i8] c"sampl\00"
+#define INPUT_FILENAME_LEN 6
+@.input_filename = constant [INPUT_FILENAME_LEN x i8] c"input\00"
+;;@.input_filename = constant [INPUT_FILENAME_LEN x i8] c"sampl\00"
+
+#define MEMORY_LEN 100000
+@.memory = global [MEMORY_LEN x i64] zeroinitializer
+
+define i1 @searchmemoryorput(i64 %needle) {
+  entry:
+    br label %loop
+  loop:
+    %i = phi i64 [0, %entry], [%nexti, %notfound]
+    %cond = icmp eq i64 %i, MEMORY_LEN
+    br i1 %cond, label %end, label %isnotend
+  isnotend:
+    ;%m = PTR(MEMORY_LEN, @.memory, %i)
+    %m = i8* getelementptr inbounds ([100000 x i8], [100000 x i8]* @.memory, i32 0, i32 %i)
+    %cur = load i64, i64* %m
+    %cond2 = icmp eq i64 %m2, %needle
+    br i1 %cond2, label %found, label %notfound
+  notfound:
+    %nexti = add i64 %i, 1
+    br label %loop
+  found:
+    ret i1 1
+  end:
+    %lastloc = PTR(MEMORY_LEN, @.memory, %i)
+    store i64 %needle, i64* %lastloc
+    ret i1 0
+}
 
 define i32 @main() {
+    %part1 = call i64 @part1()
+    call void @putnum(i64 %part1)
+    call void @putc(i8 NEWLINE)
+    call i64 @exit(i64 0)
+    ret i32 0
+}
+
+define i64 @part2() {
+  ret i64 0
+}
+
+define i64 @part1() {
   #define PLUS 43
   entry:
-    %fd = call i64 @open(PTR(6, @.input_filename))
+    %fd = call i64 @open(PTR(INPUT_FILENAME_LEN, @.input_filename, 0))
     br label %loop
   loop:
     %sum = phi i64 [0, %entry], [%nextsum, %isnotend]
@@ -31,10 +71,7 @@ define i32 @main() {
     %nextsum = add i64 %sum, %n2
     br label %loop
   end:
-    call void @putnum(i64 %sum)
-    call void @putc(i8 NEWLINE)
-    call i64 @exit(i64 0)
-    ret i32 0
+    ret i64 %sum
 }
 
 define void @putnum(i64 %n) {
